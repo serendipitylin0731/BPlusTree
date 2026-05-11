@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ## =================================================================
 ## BUSTUB PACKAGE INSTALLATION
@@ -7,15 +7,14 @@
 ## build and run the DBMS.
 ##
 ## Supported environments:
-##  * Ubuntu 22.04 (x86-64)
-##  * macOS 11 Big Sur (x86-64 or ARM)
-##  * macOS 12 Monterey (x86-64 or ARM)
+##  * Ubuntu / WSL (x86-64)
+##  * macOS with Homebrew (x86-64 or ARM)
 ## =================================================================
 
 main() {
   set -o errexit
 
-    if [ "$1" == "-y" ] 
+    if [ "${1:-}" == "-y" ] 
     then 
         install
     else
@@ -40,11 +39,11 @@ install() {
     DARWIN) install_mac ;;
 
     LINUX)
-      version=$(cat /etc/os-release | grep VERSION_ID | cut -d '"' -f 2)
-      case $version in
-        18.04) install_linux ;;
-        20.04) install_linux ;;
-        22.04) install_linux ;;
+      if [ -f /etc/os-release ]; then
+        . /etc/os-release
+      fi
+      case ${ID:-} in
+        ubuntu) install_linux ;;
         *) give_up ;;
       esac
       ;;
@@ -67,7 +66,7 @@ give_up() {
 
 install_mac() {
   # Install Homebrew.
-  if test ! $(which brew); then
+  if ! command -v brew >/dev/null 2>&1; then
     echo "Installing Homebrew (https://brew.sh/)"
     bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
   fi
@@ -78,7 +77,7 @@ install_mac() {
   brew ls --versions coreutils || brew install coreutils
   brew ls --versions doxygen || brew install doxygen
   brew ls --versions git || brew install git
-  (brew ls --versions llvm | grep 14) || brew install llvm@14
+  brew ls --versions llvm || brew install llvm
   brew ls --versions libelf || brew install libelf
 }
 
@@ -86,18 +85,26 @@ install_linux() {
   # Update apt-get.
   apt-get -y update
   # Install packages.
-  apt-get -y install \
-      build-essential \
-      clang-14 \
-      clang-format-14 \
-      clang-tidy-14 \
-      cmake \
-      doxygen \
-      git \
-      pkg-config \
-      zlib1g-dev \
-      libelf-dev \
+  packages=(
+      build-essential
+      cmake
+      doxygen
+      git
+      pkg-config
+      zlib1g-dev
+      libelf-dev
       libdwarf-dev
+  )
+
+  for package in clang-14 clang-format-14 clang-tidy-14; do
+    if apt-cache show "$package" >/dev/null 2>&1; then
+      packages+=("$package")
+    else
+      packages+=("${package%-14}")
+    fi
+  done
+
+  apt-get -y install "${packages[@]}"
 }
 
 main "$@"
